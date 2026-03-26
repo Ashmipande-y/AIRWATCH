@@ -35,7 +35,19 @@ AirWatch is a real-time air quality monitoring dashboard for Rajasthan, India. I
    cd airwatch
    ```
 
-2. Install dependencies:
+2. Create and activate a virtual environment:
+   ```bash
+   # Create venv
+   python3 -m venv venv
+
+   # Activate (macOS/Linux)
+   source venv/bin/activate
+
+   # Activate (Windows)
+   # venv\Scripts\activate
+   ```
+
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
