@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AirWatch — District Map</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #0d0f0e; --surface: rgba(255,255,255,0.04); --border: rgba(255,255,255,0.1);
+      --text: #e8e6df; --muted: rgba(232,230,223,0.42);
+      --mono: 'DM Mono', monospace; --serif: 'Playfair Display', Georgia, serif; --sans: 'DM Sans', sans-serif;
+      --good:#4ade80; --moderate:#fbbf24; --unhealthy:#fb923c; --hazardous:#f43f5e;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 44px; border-bottom:1px solid var(--border); background:rgba(13,15,14,0.95); position:sticky; top:0; z-index:1000; }
+    .topbar-brand { font-family:var(--serif); font-size:20px; color:#fff; text-decoration:none; }
+    .topbar-nav { display:flex; gap:28px; }
+    .topbar-nav a { font-family:var(--mono); font-size:11px; letter-spacing:0.14em; color:var(--muted); text-decoration:none; text-transform:uppercase; transition:color 0.2s; }
+    .topbar-nav a:hover, .topbar-nav a.active { color:#fff; }
+
+    .page-head { padding:36px 44px 24px; border-bottom:1px solid var(--border); }
+    .page-tag { font-family:var(--mono); font-size:10px; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-bottom:8px; }
+    .page-title { font-family:var(--serif); font-size:clamp(28px,4vw,42px); font-weight:700; color:#fff; }
+
+    .map-wrap { position:relative; height:calc(100vh - 200px); min-height:500px; }
+    #map { height:100%; width:100%; background:#111; }
+    .leaflet-container { background:#0d0f0e; }
+
+    .legend-box { position:absolute; bottom:28px; left:24px; z-index:999; background:rgba(13,15,14,0.92); border:1px solid var(--border); border-radius:6px; padding:16px 20px; backdrop-filter:blur(8px); }
+    .legend-title { font-family:var(--mono); font-size:10px; letter-spacing:0.16em; color:var(--muted); text-transform:uppercase; margin-bottom:10px; }
+    .legend-row { display:flex; align-items:center; gap:9px; font-size:12px; margin-bottom:6px; }
+    .legend-pip { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+    .refresh-btn { position:absolute; top:20px; right:20px; z-index:999; background:rgba(13,15,14,0.9); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:11px; letter-spacing:0.12em; padding:9px 18px; border-radius:4px; cursor:pointer; transition:background 0.2s, border-color 0.2s; }
+    .refresh-btn:hover { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.25); }
+
+    .footer { padding:16px 44px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .footer-name { font-family:var(--serif); font-size:13px; color:var(--muted); }
+    .footer-note { font-family:var(--mono); font-size:10px; color:rgba(232,230,223,0.18); letter-spacing:0.1em; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-brand" href="/">AirWatch</a>
+  <nav class="topbar-nav">
+    <a href="/">Dashboard</a>
+    <a href="/map" class="active">Map</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/districts">Districts</a>
+    <a href="/health">Health</a>
+    <a href="/about">About</a>
+  </nav>
+</div>
+
+<div class="page-head">
+  <div class="page-tag">Rajasthan Air Quality</div>
+  <h1 class="page-title">District Map</h1>
+</div>
+
+<div class="map-wrap">
+  <div id="map"></div>
+  <button class="refresh-btn" onclick="loadDistricts()">↻ Refresh Data</button>
+  <div class="legend-box">
+    <div class="legend-title">AQI Scale</div>
+    <div class="legend-row"><div class="legend-pip" style="background:#4ade80"></div>0–100 Good</div>
+    <div class="legend-row"><div class="legend-pip" style="background:#fbbf24"></div>101–150 Moderate</div>
+    <div class="legend-row"><div class="legend-pip" style="background:#fb923c"></div>151–200 Unhealthy</div>
+    <div class="legend-row"><div class="legend-pip" style="background:#f43f5e"></div>200+ Hazardous</div>
+  </div>
+</div>
+
+<div class="footer">
+  <span class="footer-name">AirWatch</span>
+  <span class="footer-note">Leaflet.js — live district data</span>
+</div>
+
+<script>
+  const map = L.map('map', { center:[26.5, 74.5], zoom:7, zoomControl:true });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution:'© OpenStreetMap contributors © CARTO',
+    maxZoom:18
+  }).addTo(map);
+
+  function aqiColor(v){ return v>200?'#f43f5e':v>150?'#fb923c':v>100?'#fbbf24':'#4ade80'; }
+  function aqiLabel(v){ return v>200?'Hazardous':v>150?'Unhealthy':v>100?'Moderate':'Good'; }
+
+  let geoJsonLayer;
+  let markers = [];
+
+  // Map GeoJSON district names to API district names if they differ
+  const nameMap = {
+    'Saway Madhopur': 'Swai Madhopur',
+    'Ganganagar': 'Ganganagar',
+    'Jalor': 'Jalor',
+    // Add more mappings if needed based on GeoJSON properties
+  };
+
+  async function loadDistricts() {
+    const res = await fetch('/api/districts');
+    const districts = await res.json();
+    const districtMap = {};
+    districts.forEach(d => { districtMap[d.name] = d; });
+
+    // Load GeoJSON
+    const geoRes = await fetch('https://raw.githubusercontent.com/shuklaneerajdev/IndiaStateTopojsonFiles/master/Rajasthan.geojson');
+    const geoData = await geoRes.json();
+
+    if (geoJsonLayer) map.removeLayer(geoJsonLayer);
+    markers.forEach(m => m.remove());
+    markers = [];
+
+    geoJsonLayer = L.geoJson(geoData, {
+      style: function(feature) {
+        const rawName = feature.properties.Dist_Name;
+        const name = nameMap[rawName] || rawName;
+        const d = districtMap[name];
+        const aqi = d ? d.aqi : 0;
+        return {
+          fillColor: aqiColor(aqi),
+          weight: 1.5,
+          opacity: 1,
+          color: 'rgba(255,255,255,0.2)',
+          fillOpacity: 0.4
+        };
+      },
+      onEachFeature: function(feature, layer) {
+        const rawName = feature.properties.Dist_Name;
+        const name = nameMap[rawName] || rawName;
+        const d = districtMap[name];
+        
+        if (d) {
+          layer.bindPopup(`
+            <div style="font-family:'DM Sans',sans-serif;min-width:160px">
+              <div style="font-size:15px;font-weight:600;margin-bottom:6px">${d.name}</div>
+              <div style="font-size:12px;color:#888;margin-bottom:2px">AQI &nbsp;<strong style="color:${aqiColor(d.aqi)};font-size:15px">${d.aqi}</strong> — ${aqiLabel(d.aqi)}</div>
+              <div style="font-size:11px;color:#999">PM2.5: ${d.pm25} µg/m³ &nbsp;|&nbsp; CO₂: ${d.co2} ppm</div>
+            </div>
+          `);
+        }
+
+        layer.on({
+          mouseover: function(e) {
+            const l = e.target;
+            l.setStyle({ fillOpacity: 0.7, weight: 2, color: '#fff' });
+            l.bringToFront();
+          },
+          mouseout: function(e) {
+            geoJsonLayer.resetStyle(e.target);
+          }
+        });
+      }
+    }).addTo(map);
+
+    // Also keep small markers for precise locations
+    districts.forEach(d => {
+      const color = aqiColor(d.aqi);
+      const circle = L.circleMarker([d.lat, d.lon], {
+        radius: 4,
+        fillColor: '#fff', color: color,
+        weight: 1, opacity: 1, fillOpacity: 0.8
+      }).addTo(map);
+      markers.push(circle);
+    });
+  }
+  loadDistricts();
+</script>
+</body>
+</html>

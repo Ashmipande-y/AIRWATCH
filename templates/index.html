@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AirWatch — Live Air Quality</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d0f0e;
+      --surface: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.1);
+      --text: #e8e6df;
+      --muted: rgba(232,230,223,0.42);
+      --mono: 'DM Mono', monospace;
+      --serif: 'Playfair Display', Georgia, serif;
+      --sans: 'DM Sans', sans-serif;
+      --good:     #4ade80;
+      --moderate: #fbbf24;
+      --unhealthy:#fb923c;
+      --hazardous:#f43f5e;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; min-height: 100vh; overflow-x: hidden; }
+
+    /* Topbar */
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 44px; border-bottom:1px solid var(--border); background:rgba(13,15,14,0.95); position:sticky; top:0; z-index:1000; }
+    .topbar-brand { font-family:var(--serif); font-size:20px; color:#fff; text-decoration:none; }
+    .topbar-nav { display:flex; gap:28px; }
+    .topbar-nav a { font-family:var(--mono); font-size:11px; letter-spacing:0.14em; color:var(--muted); text-decoration:none; text-transform:uppercase; transition:color 0.2s; }
+    .topbar-nav a:hover, .topbar-nav a.active { color:#fff; }
+
+    /* Hero */
+    .hero { position: relative; height: 340px; overflow: hidden; border-bottom: 1px solid var(--border); }
+    .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 65%; filter: brightness(0.32) saturate(0.55); transition: transform 10s ease; }
+    .hero:hover .hero-img { transform: scale(1.025); }
+    .hero-overlay {
+      position: absolute; inset: 0;
+      background:
+        linear-gradient(to right, rgba(13,15,14,0.88) 0%, rgba(13,15,14,0.25) 55%, transparent 100%),
+        linear-gradient(to top, rgba(13,15,14,1) 0%, transparent 50%);
+    }
+    .hero-inner { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; padding: 36px 44px; max-width: 1200px; margin: 0 auto; }
+    .site-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.22em; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
+    .hero-title { font-family: var(--serif); font-size: clamp(38px, 5vw, 60px); font-weight: 700; line-height: 1.06; letter-spacing: -0.02em; color: #fff; }
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; color: var(--good);
+      border: 1px solid rgba(74,222,128,0.28); border-radius: 3px; padding: 4px 10px;
+      margin-left: 16px; vertical-align: middle; position: relative; top: -7px;
+    }
+    .live-dot { width: 6px; height: 6px; background: var(--good); border-radius: 50%; animation: breathe 2s ease-in-out infinite; }
+    @keyframes breathe { 0%,100%{opacity:1} 50%{opacity:0.25} }
+    .hero-clock { margin-top: 12px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+    /* Alert ribbon */
+    .alert-ribbon { display: flex; align-items: center; gap: 14px; padding: 13px 44px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.025); transition: background 0.5s, border-color 0.5s; }
+    .alert-ribbon.hazardous { background: rgba(244,63,94,0.1); border-color: rgba(244,63,94,0.3); }
+    .alert-ribbon.unhealthy { background: rgba(251,146,60,0.07); border-color: rgba(251,146,60,0.22); }
+    .alert-ribbon.moderate  { background: rgba(251,191,36,0.05); border-color: rgba(251,191,36,0.18); }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background 0.4s, box-shadow 0.4s; }
+    .alert-ribbon.good .status-dot     { background: var(--good);      box-shadow: 0 0 10px var(--good); }
+    .alert-ribbon.moderate .status-dot { background: var(--moderate);  box-shadow: 0 0 10px var(--moderate); }
+    .alert-ribbon.unhealthy .status-dot{ background: var(--unhealthy); box-shadow: 0 0 10px var(--unhealthy); }
+    .alert-ribbon.hazardous .status-dot{ background: var(--hazardous); box-shadow: 0 0 10px var(--hazardous); animation: breathe 0.7s infinite; }
+    .ribbon-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; }
+    .ribbon-msg { font-size: 14px; font-weight: 500; color: var(--text); flex: 1; }
+    .ribbon-pred { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+    /* Layout */
+    .page { max-width: 1200px; margin: 0 auto; padding: 0 44px 60px; }
+
+    /* KPI strip */
+    .kpi-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); margin: 0 -44px; }
+    .kpi { background: var(--bg); padding: 30px 36px 26px; position: relative; overflow: hidden; transition: background 0.2s; }
+    .kpi:hover { background: rgba(255,255,255,0.018); }
+    .kpi::before { content:''; position:absolute; bottom:0; left:36px; right:36px; height:1px; background:var(--kpi-accent,transparent); transform:scaleX(0); transform-origin:left; transition:transform 0.5s ease; }
+    .kpi.flash::before { transform: scaleX(1); }
+    .kpi-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+    .kpi-num { font-family: var(--serif); font-size: 56px; line-height: 1; font-weight: 700; color: #fff; transition: color 0.5s; letter-spacing: -0.02em; }
+    .kpi-unit { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-left: 4px; font-weight: 400; }
+    .kpi-hint { font-size: 12px; color: var(--muted); margin-top: 7px; }
+
+    /* Two-column */
+    .two-col { display: grid; grid-template-columns: 1fr 340px; gap: 22px; margin-top: 30px; }
+
+    /* Chart */
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 24px 28px; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .card-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.17em; color: var(--muted); text-transform: uppercase; }
+    .legend { display: flex; gap: 14px; }
+    .leg-item { display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+    .leg-line { width: 20px; height: 2px; border-radius: 1px; }
+
+    /* Sidebar */
+    .sidebar { display: flex; flex-direction: column; gap: 18px; }
+
+    /* Forecast tile */
+    .forecast-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; display: flex; }
+    .forecast-photo { width: 88px; height: 88px; object-fit: cover; filter: brightness(0.55) saturate(0.45); flex-shrink: 0; }
+    .forecast-body { padding: 14px 16px; }
+    .forecast-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+    .forecast-num { font-family: var(--serif); font-size: 28px; font-weight: 700; color: #fff; line-height: 1; transition: color 0.4s; }
+    .forecast-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    /* Reference card */
+    .ref-card { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+    .ref-photo { width: 100%; height: 130px; object-fit: cover; display: block; filter: brightness(0.5) saturate(0.4); }
+    .ref-body { padding: 18px 20px; }
+    .ref-title { font-family: var(--serif); font-size: 17px; color: #fff; margin-bottom: 12px; line-height: 1.3; }
+    .scale-rows { display: flex; flex-direction: column; gap: 7px; }
+    .scale-row { display: flex; align-items: center; gap: 9px; font-size: 12px; }
+    .scale-pip { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+    .scale-range { font-family: var(--mono); font-size: 10px; color: var(--muted); min-width: 58px; }
+    .scale-label { color: var(--text); }
+
+    /* Footer */
+    .footer { margin-top: 38px; padding-top: 18px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .footer-name { font-family: var(--serif); font-size: 13px; color: var(--muted); }
+    .footer-note { font-family: var(--mono); font-size: 10px; color: rgba(232,230,223,0.18); letter-spacing: 0.1em; }
+
+    @media (max-width: 860px) {
+      .hero-inner, .alert-ribbon, .page { padding-left: 20px; padding-right: 20px; }
+      .kpi-strip { margin: 0 -20px; }
+      .kpi { padding: 20px; } .kpi-num { font-size: 40px; }
+      .two-col { grid-template-columns: 1fr; } .sidebar { display: none; }
+    }
+    @media (max-width: 520px) { .kpi-strip { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-brand" href="/">AirWatch</a>
+  <nav class="topbar-nav">
+    <a href="/" class="active">Dashboard</a>
+    <a href="/map">Map</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/districts">Districts</a>
+    <a href="/health">Health</a>
+    <a href="/about">About</a>
+  </nav>
+</div>
+
+<div class="hero">
+  <img class="hero-img"
+    src="https://images.unsplash.com/photo-1529686342540-1b43aec0df75?w=1600&q=80"
+    alt="Hazy city skyline"/>
+  <div class="hero-overlay"></div>
+  <div class="hero-inner">
+    <div class="site-tag">Real-time environmental monitoring</div>
+    <h1 class="hero-title">
+      AirWatch
+      <span class="live-badge"><span class="live-dot"></span>Live</span>
+    </h1>
+    <div class="hero-clock" id="clock">--:--:--</div>
+  </div>
+</div>
+
+<div class="alert-ribbon" id="alertRibbon">
+  <div class="status-dot"></div>
+  <span class="ribbon-tag">Status</span>
+  <span class="ribbon-msg" id="alertMsg">Initializing sensors...</span>
+  <span class="ribbon-pred" id="ribbonPred">Predicted: --</span>
+</div>
+
+<div class="page">
+  <div class="kpi-strip">
+    <div class="kpi" id="kpiAqi" style="--kpi-accent: rgba(255,255,255,0.18)">
+      <div class="kpi-tag">Air Quality Index</div>
+      <div class="kpi-num" id="numAqi">--</div>
+      <div class="kpi-hint">Scale 0 – 500</div>
+    </div>
+    <div class="kpi" id="kpiPm" style="--kpi-accent: rgba(255,255,255,0.18)">
+      <div class="kpi-tag">Fine Particulates</div>
+      <div class="kpi-num" id="numPm">--<span class="kpi-unit">µg/m³</span></div>
+      <div class="kpi-hint">PM2.5 concentration</div>
+    </div>
+    <div class="kpi" id="kpiCo2" style="--kpi-accent: rgba(255,255,255,0.18)">
+      <div class="kpi-tag">Carbon Dioxide</div>
+      <div class="kpi-num" id="numCo2">--<span class="kpi-unit">ppm</span></div>
+      <div class="kpi-hint">CO₂ ambient level</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="chart-card">
+      <div class="card-head">
+        <span class="card-tag">30-Reading Trend</span>
+        <div class="legend">
+          <div class="leg-item"><div class="leg-line" style="background:#e2c97e"></div>AQI</div>
+          <div class="leg-item"><div class="leg-line" style="background:#7eb8e2"></div>PM2.5</div>
+        </div>
+      </div>
+      <canvas id="trendChart" height="82"></canvas>
+    </div>
+
+    <div class="sidebar">
+      <div class="forecast-tile">
+        <img class="forecast-photo"
+          src="https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=300&q=80"
+          alt="Sky forecast"/>
+        <div class="forecast-body">
+          <div class="forecast-tag">Predicted AQI</div>
+          <div class="forecast-num" id="forecastNum">--</div>
+          <div class="forecast-hint">Next interval estimate</div>
+        </div>
+      </div>
+
+      <div class="ref-card">
+        <img class="ref-photo"
+          src="https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=800&q=80"
+          alt="Smog over a city"/>
+        <div class="ref-body">
+          <div class="ref-title">AQI Reference Scale</div>
+          <div class="scale-rows">
+            <div class="scale-row"><div class="scale-pip" style="background:#4ade80"></div><span class="scale-range">0 – 50</span><span class="scale-label">Good</span></div>
+            <div class="scale-row"><div class="scale-pip" style="background:#fbbf24"></div><span class="scale-range">51 – 100</span><span class="scale-label">Moderate</span></div>
+            <div class="scale-row"><div class="scale-pip" style="background:#fb923c"></div><span class="scale-range">101 – 150</span><span class="scale-label">Unhealthy for sensitive groups</span></div>
+            <div class="scale-row"><div class="scale-pip" style="background:#f43f5e"></div><span class="scale-range">151 – 300</span><span class="scale-label">Unhealthy / Hazardous</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="footer-name">AirWatch</span>
+    <span class="footer-note">Refreshes every 5s — Flask + scikit-learn</span>
+  </div>
+</div>
+
+<script>
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  const MAX = 30;
+  const chartData = {
+    labels: [],
+    datasets: [
+      { label:'AQI', data:[], borderColor:'#e2c97e', backgroundColor:'rgba(226,201,126,0.06)', borderWidth:1.5, pointRadius:2, tension:0.4, fill:true },
+      { label:'PM2.5', data:[], borderColor:'#7eb8e2', backgroundColor:'rgba(126,184,226,0.04)', borderWidth:1.5, pointRadius:2, tension:0.4, fill:true }
+    ]
+  };
+  const chart = new Chart(ctx, {
+    type: 'line', data: chartData,
+    options: {
+      responsive: true, animation: { duration: 350 },
+      plugins: { legend:{ display:false }, tooltip:{
+        backgroundColor:'#1a1d1c', borderColor:'rgba(255,255,255,0.1)', borderWidth:1,
+        titleColor:'rgba(232,230,223,0.4)', bodyColor:'#e8e6df',
+        titleFont:{ family:'DM Mono', size:10 }, bodyFont:{ family:'DM Mono', size:12 }, padding:10
+      }},
+      scales: {
+        x:{ ticks:{ color:'rgba(232,230,223,0.28)', font:{family:'DM Mono',size:9}, maxTicksLimit:5 }, grid:{ color:'rgba(255,255,255,0.04)' }, border:{ color:'rgba(255,255,255,0.07)' } },
+        y:{ ticks:{ color:'rgba(232,230,223,0.28)', font:{family:'DM Mono',size:10} }, grid:{ color:'rgba(255,255,255,0.04)' }, border:{ color:'rgba(255,255,255,0.07)' } }
+      }
+    }
+  });
+
+  function aqiColor(v){ return v>200?'var(--hazardous)':v>150?'var(--unhealthy)':v>100?'var(--moderate)':'var(--good)'; }
+  function fmtTime(iso){ return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+
+  setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }, 1000);
+
+  function flashKpi(id) {
+    const el = document.getElementById(id);
+    el.classList.add('flash');
+    setTimeout(()=>el.classList.remove('flash'), 700);
+  }
+
+  async function apiFetch(url, opts={}) {
+    const res = await fetch(url, opts);
+    if (!res.ok) throw new Error(res.status);
+    return res.json();
+  }
+
+  async function tick() {
+    try {
+      const r = await apiFetch('/readings/generate', { method:'POST' });
+      document.getElementById('numAqi').textContent = r.aqi;
+      document.getElementById('numPm').innerHTML = r.pm25 + '<span class="kpi-unit">µg/m³</span>';
+      document.getElementById('numCo2').innerHTML = r.co2 + '<span class="kpi-unit">ppm</span>';
+      document.getElementById('numAqi').style.color = aqiColor(r.aqi);
+      ['kpiAqi','kpiPm','kpiCo2'].forEach(flashKpi);
+
+      chartData.labels.push(fmtTime(r.time));
+      chartData.datasets[0].data.push(r.aqi);
+      chartData.datasets[1].data.push(r.pm25);
+      if (chartData.labels.length > MAX) { chartData.labels.shift(); chartData.datasets.forEach(d=>d.data.shift()); }
+      chart.update();
+    } catch(_) {}
+
+    try {
+      const a = await apiFetch('/alert');
+      document.getElementById('alertRibbon').className = 'alert-ribbon ' + (a.level||'');
+      document.getElementById('alertMsg').textContent = a.message;
+    } catch(_) {}
+
+    try {
+      const p = await apiFetch('/predict');
+      const fn = document.getElementById('forecastNum');
+      const rp = document.getElementById('ribbonPred');
+      if (p.predicted_aqi != null) {
+        fn.textContent = p.predicted_aqi;
+        fn.style.color = aqiColor(p.predicted_aqi);
+        rp.textContent = 'Predicted: ' + p.predicted_aqi + ' AQI';
+      } else {
+        fn.textContent = '--';
+        rp.textContent = 'Predicted: collecting data';
+      }
+    } catch(_) {}
+  }
+
+  tick();
+  setInterval(tick, 5000);
+</script>
+</body>
+</html>

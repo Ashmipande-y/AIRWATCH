@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AirWatch — About</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:#0d0f0e; --surface:rgba(255,255,255,0.04); --border:rgba(255,255,255,0.1);
+      --text:#e8e6df; --muted:rgba(232,230,223,0.42);
+      --mono:'DM Mono',monospace; --serif:'Playfair Display',Georgia,serif; --sans:'DM Sans',sans-serif;
+      --good:#4ade80;
+    }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; }
+
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 44px; border-bottom:1px solid var(--border); background:rgba(13,15,14,0.95); position:sticky; top:0; z-index:1000; }
+    .topbar-brand { font-family:var(--serif); font-size:20px; color:#fff; text-decoration:none; }
+    .topbar-nav { display:flex; gap:28px; }
+    .topbar-nav a { font-family:var(--mono); font-size:11px; letter-spacing:0.14em; color:var(--muted); text-decoration:none; text-transform:uppercase; transition:color 0.2s; }
+    .topbar-nav a:hover, .topbar-nav a.active { color:#fff; }
+
+    .page-head { padding:36px 44px 28px; border-bottom:1px solid var(--border); }
+    .page-tag { font-family:var(--mono); font-size:10px; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-bottom:8px; }
+    .page-title { font-family:var(--serif); font-size:clamp(28px,4vw,42px); font-weight:700; color:#fff; }
+
+    .page { max-width:860px; margin:0 auto; padding:44px 44px 80px; }
+
+    .lead { font-size:16px; line-height:1.75; color:rgba(232,230,223,0.72); margin-bottom:44px; }
+
+    .section-tag { font-family:var(--mono); font-size:10px; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-bottom:16px; }
+    .section-title { font-family:var(--serif); font-size:22px; color:#fff; margin-bottom:12px; }
+
+    .tech-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; margin-bottom:48px; }
+    .tech-card { background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:18px 20px; }
+    .tech-name { font-family:var(--mono); font-size:13px; color:var(--good); margin-bottom:5px; }
+    .tech-desc { font-size:12px; color:var(--muted); line-height:1.5; }
+
+    .api-table { width:100%; border-collapse:collapse; margin-bottom:48px; font-size:13px; }
+    .api-table th { font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--muted); text-transform:uppercase; text-align:left; padding:8px 14px; border-bottom:1px solid var(--border); }
+    .api-table td { padding:11px 14px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:top; }
+    .api-table tr:last-child td { border-bottom:none; }
+    .api-table td:first-child { font-family:var(--mono); font-size:12px; color:var(--good); white-space:nowrap; }
+    .api-table td:nth-child(2) { font-family:var(--mono); font-size:11px; color:rgba(232,230,223,0.3); }
+
+    .footer { margin-top:38px; padding-top:18px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .footer-name { font-family:var(--serif); font-size:13px; color:var(--muted); }
+    .footer-note { font-family:var(--mono); font-size:10px; color:rgba(232,230,223,0.18); letter-spacing:0.1em; }
+
+    @media(max-width:600px){ .page,.page-head,.topbar{padding-left:20px;padding-right:20px;} }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-brand" href="/">AirWatch</a>
+  <nav class="topbar-nav">
+    <a href="/">Dashboard</a>
+    <a href="/map">Map</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/districts">Districts</a>
+    <a href="/health">Health</a>
+    <a href="/about" class="active">About</a>
+  </nav>
+</div>
+
+<div class="page-head">
+  <div class="page-tag">Project Overview</div>
+  <h1 class="page-title">About AirWatch</h1>
+</div>
+
+<div class="page">
+  <p class="lead">
+    AirWatch is a real-time air quality monitoring dashboard for Rajasthan, India.
+    It simulates live AQI, PM2.5, and CO₂ sensor readings across all 33 districts,
+    uses ML-based forecasting to predict the next AQI value, and visualises data
+    on an interactive GeoJSON-based map, a detailed district status list, and an analytics dashboard.
+  </p>
+
+  <div class="section-tag">New Features</div>
+  <div class="tech-grid">
+    <div class="tech-card"><div class="tech-name">District Status</div><div class="tech-desc">Searchable and sortable list of all 33 districts with live metrics.</div></div>
+    <div class="tech-card"><div class="tech-name">Health Tips</div><div class="tech-desc">Safety guidelines based on real-time AQI levels for all risk categories.</div></div>
+    <div class="tech-card"><div class="tech-name">GeoJSON Map</div><div class="tech-desc">Interactive district boundaries colored by live pollution levels.</div></div>
+  </div>
+
+  <div class="section-tag">Technology Stack</div>
+  <div class="tech-grid">
+    <div class="tech-card"><div class="tech-name">Flask</div><div class="tech-desc">Python web framework serving all routes and REST APIs</div></div>
+    <div class="tech-card"><div class="tech-name">Open-Meteo API</div><div class="tech-desc">Live, real-time air quality data for 33+ Rajasthan districts</div></div>
+    <div class="tech-card"><div class="tech-name">scikit-learn</div><div class="tech-desc">LinearRegression model for next-reading AQI prediction</div></div>
+    <div class="tech-card"><div class="tech-name">pandas + numpy</div><div class="tech-desc">Data wrangling and numerical operations for ML pipeline</div></div>
+    <div class="tech-card"><div class="tech-name">Chart.js</div><div class="tech-desc">Animated trend and analytics charts</div></div>
+    <div class="tech-card"><div class="tech-name">Leaflet.js</div><div class="tech-desc">Interactive map with colour-coded district markers</div></div>
+    <div class="tech-card"><div class="tech-name">Vanilla JS</div><div class="tech-desc">Polling, DOM updates, and live data rendering</div></div>
+  </div>
+
+  <div class="section-tag">API Reference</div>
+  <div class="section-title">Endpoints</div>
+  <table class="api-table">
+    <thead><tr><th>Endpoint</th><th>Method</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>/readings/generate</td><td>POST</td><td>Generate and store a new AQI reading</td></tr>
+      <tr><td>/readings/latest</td><td>GET</td><td>Return the most recent reading</td></tr>
+      <tr><td>/readings</td><td>GET</td><td>Return all stored readings (max 100)</td></tr>
+      <tr><td>/alert</td><td>GET</td><td>Return current alert level based on latest AQI</td></tr>
+      <tr><td>/predict</td><td>GET</td><td>ML-predicted AQI for the next interval</td></tr>
+      <tr><td>/api/districts</td><td>GET</td><td>Simulated live readings for all 33 districts</td></tr>
+      <tr><td>/api/analytics</td><td>GET</td><td>Top polluted, cleanest districts &amp; 24h trend</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <span class="footer-name">AirWatch</span>
+    <span class="footer-note">Built with Flask + scikit-learn</span>
+  </div>
+</div>
+
+</body>
+</html>

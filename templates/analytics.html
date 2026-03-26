@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AirWatch — Analytics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&family=DM+Mono&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:#0d0f0e; --surface:rgba(255,255,255,0.04); --border:rgba(255,255,255,0.1);
+      --text:#e8e6df; --muted:rgba(232,230,223,0.42);
+      --mono:'DM Mono',monospace; --serif:'Playfair Display',Georgia,serif; --sans:'DM Sans',sans-serif;
+      --good:#4ade80; --moderate:#fbbf24; --unhealthy:#fb923c; --hazardous:#f43f5e;
+    }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; }
+
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 44px; border-bottom:1px solid var(--border); background:rgba(13,15,14,0.95); position:sticky; top:0; z-index:1000; }
+    .topbar-brand { font-family:var(--serif); font-size:20px; color:#fff; text-decoration:none; }
+    .topbar-nav { display:flex; gap:28px; }
+    .topbar-nav a { font-family:var(--mono); font-size:11px; letter-spacing:0.14em; color:var(--muted); text-decoration:none; text-transform:uppercase; transition:color 0.2s; }
+    .topbar-nav a:hover, .topbar-nav a.active { color:#fff; }
+
+    .page-head { padding:36px 44px 28px; border-bottom:1px solid var(--border); display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+    .page-tag { font-family:var(--mono); font-size:10px; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-bottom:8px; }
+    .page-title { font-family:var(--serif); font-size:clamp(28px,4vw,42px); font-weight:700; color:#fff; }
+    .summary-pills { display:flex; gap:18px; flex-wrap:wrap; }
+    .pill { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:10px 18px; }
+    .pill-tag { font-family:var(--mono); font-size:9px; letter-spacing:0.16em; color:var(--muted); text-transform:uppercase; }
+    .pill-val { font-family:var(--serif); font-size:26px; font-weight:700; color:#fff; line-height:1.1; }
+
+    .page { max-width:1200px; margin:0 auto; padding:32px 44px 60px; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-bottom:22px; }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:24px 28px; }
+    .card-tag { font-family:var(--mono); font-size:10px; letter-spacing:0.17em; color:var(--muted); text-transform:uppercase; margin-bottom:18px; }
+    .card-full { grid-column:1/-1; }
+
+    .district-row { display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .district-row:last-child { border-bottom:none; }
+    .dr-rank { font-family:var(--mono); font-size:11px; color:var(--muted); width:18px; text-align:right; flex-shrink:0; }
+    .dr-name { font-size:13px; flex:1; }
+    .dr-bar-wrap { width:100px; height:4px; background:rgba(255,255,255,0.07); border-radius:2px; overflow:hidden; }
+    .dr-bar { height:100%; border-radius:2px; transition:width 0.6s ease; }
+    .dr-aqi { font-family:var(--mono); font-size:12px; width:38px; text-align:right; }
+
+    .footer { margin-top:38px; padding-top:18px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .footer-name { font-family:var(--serif); font-size:13px; color:var(--muted); }
+    .footer-note { font-family:var(--mono); font-size:10px; color:rgba(232,230,223,0.18); letter-spacing:0.1em; }
+
+    @media(max-width:860px){ .grid-2{grid-template-columns:1fr;} .page,.page-head{padding-left:20px;padding-right:20px;} }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-brand" href="/">AirWatch</a>
+  <nav class="topbar-nav">
+    <a href="/">Dashboard</a>
+    <a href="/map">Map</a>
+    <a href="/analytics" class="active">Analytics</a>
+    <a href="/districts">Districts</a>
+    <a href="/health">Health</a>
+    <a href="/about">About</a>
+  </nav>
+</div>
+
+<div class="page-head">
+  <div>
+    <div class="page-tag">Rajasthan Air Quality</div>
+    <h1 class="page-title">Analytics</h1>
+  </div>
+  <div class="summary-pills">
+    <div class="pill"><div class="pill-tag">Districts</div><div class="pill-val" id="statTotal">--</div></div>
+    <div class="pill"><div class="pill-tag">Avg AQI</div><div class="pill-val" id="statAvg">--</div></div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-tag">Top 8 Most Polluted Districts</div>
+      <div id="topList"></div>
+    </div>
+    <div class="card">
+      <div class="card-tag">5 Cleanest Districts</div>
+      <div id="cleanList"></div>
+    </div>
+    <div class="card card-full">
+      <div class="card-tag">24-Hour AQI &amp; PM2.5 Trend</div>
+      <canvas id="trendChart" height="60"></canvas>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="footer-name">AirWatch</span>
+    <span class="footer-note">Chart.js — simulated district analytics</span>
+  </div>
+</div>
+
+<script>
+  function aqiColor(v){ return v>200?'#f43f5e':v>150?'#fb923c':v>100?'#fbbf24':'#4ade80'; }
+
+  function renderList(containerId, districts) {
+    const el = document.getElementById(containerId);
+    const max = Math.max(...districts.map(d=>d.aqi));
+    el.innerHTML = districts.map((d,i)=>`
+      <div class="district-row">
+        <span class="dr-rank">${i+1}</span>
+        <span class="dr-name">${d.name}</span>
+        <div class="dr-bar-wrap"><div class="dr-bar" style="width:${(d.aqi/max*100).toFixed(1)}%;background:${aqiColor(d.aqi)}"></div></div>
+        <span class="dr-aqi" style="color:${aqiColor(d.aqi)}">${d.aqi}</span>
+      </div>`).join('');
+  }
+
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  const chart = new Chart(ctx, {
+    type:'line',
+    data:{ labels:[], datasets:[
+      {label:'AQI', data:[], borderColor:'#e2c97e', backgroundColor:'rgba(226,201,126,0.06)', borderWidth:1.5, pointRadius:2, tension:0.4, fill:true},
+      {label:'PM2.5', data:[], borderColor:'#7eb8e2', backgroundColor:'rgba(126,184,226,0.04)', borderWidth:1.5, pointRadius:2, tension:0.4, fill:true}
+    ]},
+    options:{
+      responsive:true, animation:{duration:400},
+      plugins:{legend:{labels:{color:'rgba(232,230,223,0.4)',font:{family:'DM Mono',size:10}}}, tooltip:{backgroundColor:'#1a1d1c',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'rgba(232,230,223,0.4)',bodyColor:'#e8e6df',padding:10}},
+      scales:{
+        x:{ticks:{color:'rgba(232,230,223,0.28)',font:{family:'DM Mono',size:9},maxTicksLimit:8},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'rgba(255,255,255,0.07)'}},
+        y:{ticks:{color:'rgba(232,230,223,0.28)',font:{family:'DM Mono',size:10}},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'rgba(255,255,255,0.07)'}}
+      }
+    }
+  });
+
+  async function loadAnalytics(){
+    const res = await fetch('/api/analytics');
+    const d = await res.json();
+    document.getElementById('statTotal').textContent = d.total_districts;
+    document.getElementById('statAvg').textContent = d.avg_aqi;
+    renderList('topList', d.top_polluted);
+    renderList('cleanList', [...d.cleanest].reverse());
+    chart.data.labels = d.hourly_trend.map(h=>h.hour);
+    chart.data.datasets[0].data = d.hourly_trend.map(h=>h.aqi);
+    chart.data.datasets[1].data = d.hourly_trend.map(h=>h.pm25);
+    chart.update();
+  }
+  loadAnalytics();
+  setInterval(loadAnalytics, 30000);
+</script>
+</body>
+</html>
